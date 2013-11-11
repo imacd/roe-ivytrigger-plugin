@@ -276,15 +276,20 @@ public class IvyTrigger extends AbstractTriggerByFullContext<IvyTriggerContext> 
 
         //Check if there is at least one change
         log.info("\nChecking comparison to previous recorded dependencies.");
+        int changesFound=0;
         for (Map.Entry<String, IvyDependencyValue> dependency : previousDependencies.entrySet()) {
             if (isDependencyChanged(log, dependency, newComputedDependencies)) {
                 setNewContext(newIvyTriggerContext);
-                return true;
+                changesFound++;
             }
         }
 
+        if(changesFound>0){
+            return true;
+        }else{
         setNewContext(newIvyTriggerContext);
         return false;
+        }
     }
 
     private boolean isDependencyChanged(XTriggerLog log,
