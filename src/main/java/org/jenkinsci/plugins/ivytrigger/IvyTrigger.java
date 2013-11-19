@@ -301,22 +301,22 @@ public class IvyTrigger extends AbstractTriggerByFullContext<IvyTriggerContext> 
         String dependencyId = previousDependency.getKey();
         String dependencyName = dependencyId.split(";")[0];
         
-        log.info(String.format("Checking previous recording dependency %s | Name: %s", dependencyId,dependencyName));
+        log.info(String.format("Checking previous recording dependency %s", dependencyId));
 
         IvyDependencyValue previousDependencyValue = previousDependency.getValue();
         IvyDependencyValue newDependencyValue = newComputedDependencies.get(dependencyId);
         
 		// if we find nothing try to search just the name ignoring the revision.
 		if (newDependencyValue == null) {
-	        log.info(String.format("Failed to find the new dependency for %s. Will trying to use just the name.",dependencyName));
+	        //log.info(String.format("Failed to find the new dependency for %s. Will try using just the name.",dependencyName));
 			// try to detect changes in the revision number even if a fixed
 			// revision is provided
 			for (Entry<String, IvyDependencyValue> newDepEntry : newComputedDependencies.entrySet()) {
 				String newdependencyName = newDepEntry.getKey().split(";")[0];
-		        log.info(String.format(".....Comparing dependency %s with name %s with the old dependency name %s ",newDepEntry.getKey(),newdependencyName,dependencyName));
+		        //log.info(String.format(".....Comparing dependency %s with name %s with the old dependency name %s ",newDepEntry.getKey(),newdependencyName,dependencyName));
 				if (newdependencyName.equalsIgnoreCase(dependencyName)) {
 					newDependencyValue = newDepEntry.getValue();
-			        log.info(".....Match found! New Dependency Value: "+newDependencyValue);
+			        //log.info(".....Match found! New Dependency Value: "+newDependencyValue);
 					break;
 				}
 			}
