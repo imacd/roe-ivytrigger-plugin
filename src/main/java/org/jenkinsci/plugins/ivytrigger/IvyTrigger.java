@@ -8,6 +8,7 @@ import hudson.console.AnnotatedLargeText;
 import hudson.model.AbstractProject;
 import hudson.model.Action;
 import hudson.model.Node;
+
 import org.apache.commons.jelly.XMLOutput;
 import org.jenkinsci.lib.envinject.EnvInjectException;
 import org.jenkinsci.lib.envinject.service.EnvVarsResolver;
@@ -24,6 +25,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.nio.charset.Charset;
 import java.util.*;
+import java.util.Map.Entry;
 
 
 /**
@@ -301,7 +303,20 @@ public class IvyTrigger extends AbstractTriggerByFullContext<IvyTriggerContext> 
 
         IvyDependencyValue previousDependencyValue = previousDependency.getValue();
         IvyDependencyValue newDependencyValue = newComputedDependencies.get(dependencyId);
-
+        
+		// if we find nothing try to search just the name ignoring the revision.
+		if (newDependencyValue == null) {
+			// try to detect changes in the revision number even if a fixed
+			// revision is provided
+			for (Entry<String, IvyDependencyValue> newDepEntry : newComputedDependencies
+					.entrySet()) {
+				if (newDepEntry.getKey().split(";")[0]
+						.equalsIgnoreCase(dependencyId.split(";")[0])) {
+					newDependencyValue = newDepEntry.getValue();
+				}
+			}
+		}
+            
         //Check if the previous dependency exists anymore
         if (newDependencyValue == null) {
             log.info(String.format("....The previous dependency %s doesn't exist anymore.", dependencyId));
