@@ -299,20 +299,25 @@ public class IvyTrigger extends AbstractTriggerByFullContext<IvyTriggerContext> 
                                         Map<String, IvyDependencyValue> newComputedDependencies) {
 
         String dependencyId = previousDependency.getKey();
-        log.info(String.format("Checking previous recording dependency %s", dependencyId));
+        String dependencyName = dependencyId.split(";")[0];
+        
+        log.info(String.format("Checking previous recording dependency %s | Name: %s", dependencyId,dependencyName));
 
         IvyDependencyValue previousDependencyValue = previousDependency.getValue();
         IvyDependencyValue newDependencyValue = newComputedDependencies.get(dependencyId);
         
 		// if we find nothing try to search just the name ignoring the revision.
 		if (newDependencyValue == null) {
+	        log.info(String.format("Failed to find the new dependency for %s. Will trying to use just the name.",dependencyName));
 			// try to detect changes in the revision number even if a fixed
 			// revision is provided
-			for (Entry<String, IvyDependencyValue> newDepEntry : newComputedDependencies
-					.entrySet()) {
-				if (newDepEntry.getKey().split(";")[0]
-						.equalsIgnoreCase(dependencyId.split(";")[0])) {
+			for (Entry<String, IvyDependencyValue> newDepEntry : newComputedDependencies.entrySet()) {
+				String newdependencyName = newDepEntry.getKey().split(";")[0];
+		        log.info(String.format(".....Comparing dependency %s with name %s with the old dependency name %s ",newDepEntry.getKey(),newdependencyName,dependencyName));
+				if (newdependencyName.equalsIgnoreCase(dependencyName)) {
 					newDependencyValue = newDepEntry.getValue();
+			        log.info(".....Match found! New Dependency Value: "+newDependencyValue);
+					break;
 				}
 			}
 		}
@@ -348,12 +353,17 @@ public class IvyTrigger extends AbstractTriggerByFullContext<IvyTriggerContext> 
 
         //Check if there is at least one change to previous recording artifacts
         log.info("...Checking comparison to previous recorded artifacts.");
+        int artifactsChanged=0;
         for (IvyArtifactValue ivyArtifactValue : previousArtifactValueList) {
             if (isArtifactsChanged(log, ivyArtifactValue, newArtifactValueList)) {
-                return true;
+            	artifactsChanged++;
             }
         }
 
+        if(artifactsChanged>0){
+        	return true;
+        }
+        
         return false;
     }
 
