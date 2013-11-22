@@ -264,25 +264,38 @@ public class IvyTrigger extends AbstractTriggerByFullContext<IvyTriggerContext> 
             log.info(String.format("Resolved dependency %s ...", dependency.getKey()));
         }
 
+        // set the new context
         setNewContext(newIvyTriggerContext);
-        
-        if (previousDependencies == null) {
-            log.info("\nRecording dependencies state. Waiting for next schedule to compare changes between polls.");
-            return false;
-        }
 
         if (previousDependencies.size() != newComputedDependencies.size()) {
             log.info(String.format("\nThe number of resolved dependencies has changed. Were "+previousDependencies.size()+" Are "+newComputedDependencies.size()));
         }
 
-        //Check if there is at least one change
-        log.info("\nChecking comparison to previous recorded dependencies.");
+        //Check and report if there are changes left to right
         int changesFound=0;
+        log.info("\nChecking comparison to previous recorded dependencies.");
         for (Map.Entry<String, IvyDependencyValue> dependency : previousDependencies.entrySet()) {
             if (isDependencyChanged(log, dependency, newComputedDependencies)) {
                 changesFound++;
             }
         }
+        
+        //Check and report if there are new dependencies not previously recorded (right to left)
+        for (Map.Entry<String, IvyDependencyValue> newDependency : newComputedDependencies.entrySet()) {
+			String[] newdependencyName = newDependency.getKey().split(";");
+            boolean found=false;
+			for (Map.Entry<String, IvyDependencyValue> previousDependency : previousDependencies.entrySet()) {
+    			String previousdependencyName = previousDependency.getKey().split(";")[0];   
+    			if(previousdependencyName.equals(newdependencyName[0])){
+    				found=true;
+    				break;
+    			}
+            }
+			if(!found){
+	            log.info(String.format("....The new dependency %s (%s) did not exist before.", newdependencyName[0],newdependencyName[1]));
+			}       	
+        }        
+        
 
         return (changesFound>0);
     }
