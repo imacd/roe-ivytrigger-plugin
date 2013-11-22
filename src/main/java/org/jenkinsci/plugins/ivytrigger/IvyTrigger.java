@@ -292,6 +292,7 @@ public class IvyTrigger extends AbstractTriggerByFullContext<IvyTriggerContext> 
     			}
             }
 			if(!found){
+                changesFound++;
 	            log.info(String.format("....The new dependency %s (%s) did not exist before.", newdependencyName[0],newdependencyName[1]));
 			}       	
         }        
