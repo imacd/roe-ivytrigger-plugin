@@ -325,7 +325,7 @@ public class IvyTrigger extends AbstractTriggerByFullContext<IvyTriggerContext> 
         String previousRevision = previousDependencyValue.getRevision();
         String newRevision = newDependencyValue.getRevision();
         if (!newRevision.equals(previousRevision)) {
-            log.info("....The dependency version has changed.");
+            log.info("....The dependency version has changed for "+dependencyName+" .");
             log.info(String.format("....The previous version recorded was %s.", previousRevision));
             log.info(String.format("....The new computed version is %s.", newRevision));
             return true;
@@ -353,11 +353,7 @@ public class IvyTrigger extends AbstractTriggerByFullContext<IvyTriggerContext> 
             }
         }
 
-        if(artifactsChanged>0){
-        	return true;
-        }
-        
-        return false;
+        return (artifactsChanged>0);
     }
 
     private boolean isArtifactsChanged(XTriggerLog log, IvyArtifactValue previousIvyArtifactValue, List<IvyArtifactValue> newArtifactValueList) {
