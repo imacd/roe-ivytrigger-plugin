@@ -264,16 +264,15 @@ public class IvyTrigger extends AbstractTriggerByFullContext<IvyTriggerContext> 
             log.info(String.format("Resolved dependency %s ...", dependency.getKey()));
         }
 
+        setNewContext(newIvyTriggerContext);
+        
         if (previousDependencies == null) {
             log.info("\nRecording dependencies state. Waiting for next schedule to compare changes between polls.");
-            setNewContext(newIvyTriggerContext);
             return false;
         }
 
         if (previousDependencies.size() != newComputedDependencies.size()) {
-            log.info(String.format("\nThe number of resolved dependencies has changed."));
-            setNewContext(newIvyTriggerContext);
-            return true;
+            log.info(String.format("\nThe number of resolved dependencies has changed. Were "+previousDependencies.size()+" Are "+newComputedDependencies.size()));
         }
 
         //Check if there is at least one change
@@ -281,17 +280,11 @@ public class IvyTrigger extends AbstractTriggerByFullContext<IvyTriggerContext> 
         int changesFound=0;
         for (Map.Entry<String, IvyDependencyValue> dependency : previousDependencies.entrySet()) {
             if (isDependencyChanged(log, dependency, newComputedDependencies)) {
-                setNewContext(newIvyTriggerContext);
                 changesFound++;
             }
         }
 
-        if(changesFound>0){
-            return true;
-        }else{
-        setNewContext(newIvyTriggerContext);
-        return false;
-        }
+        return (changesFound>0);
     }
 
     private boolean isDependencyChanged(XTriggerLog log,
