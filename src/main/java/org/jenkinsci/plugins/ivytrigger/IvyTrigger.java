@@ -1,18 +1,31 @@
 package org.jenkinsci.plugins.ivytrigger;
 
-import antlr.ANTLRException;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Util;
 import hudson.console.AnnotatedLargeText;
-import hudson.model.AbstractProject;
 import hudson.model.Action;
+import hudson.model.AbstractProject;
 import hudson.model.Node;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+import java.nio.charset.Charset;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.commons.jelly.XMLOutput;
 import org.jenkinsci.lib.envinject.EnvInjectException;
 import org.jenkinsci.lib.envinject.service.EnvVarsResolver;
-import org.jenkinsci.lib.xtrigger.AbstractTriggerByFullContext;
 import org.jenkinsci.lib.xtrigger.XTriggerDescriptor;
 import org.jenkinsci.lib.xtrigger.XTriggerException;
 import org.jenkinsci.lib.xtrigger.XTriggerLog;
@@ -20,18 +33,13 @@ import org.jenkinsci.plugins.ivytrigger.util.FilePathFactory;
 import org.jenkinsci.plugins.ivytrigger.util.PropertiesFileContentExtractor;
 import org.kohsuke.stapler.DataBoundConstructor;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.Serializable;
-import java.nio.charset.Charset;
-import java.util.*;
-import java.util.Map.Entry;
+import antlr.ANTLRException;
 
 
 /**
  * @author Gregory Boissinot
  */
-public class IvyTrigger extends AbstractTriggerByFullContext<IvyTriggerContext> implements Serializable {
+public class IvyTrigger extends AbstractIvyTriggerByFullContext<IvyTriggerContext> implements Serializable {
 
     private String ivyPath;
 
@@ -40,6 +48,8 @@ public class IvyTrigger extends AbstractTriggerByFullContext<IvyTriggerContext> 
     private String propertiesFilePath;
 
     private String propertiesContent;
+    
+    private boolean contextSerialized;
 
     private boolean debug;
 
@@ -52,12 +62,13 @@ public class IvyTrigger extends AbstractTriggerByFullContext<IvyTriggerContext> 
     private transient PropertiesFileContentExtractor propertiesFileContentExtractor;
 
     @DataBoundConstructor
-    public IvyTrigger(String cronTabSpec, String ivyPath, String ivySettingsPath, String propertiesFilePath, String propertiesContent, LabelRestrictionClass labelRestriction, boolean enableConcurrentBuild, boolean debug) throws ANTLRException {
+    public IvyTrigger(String cronTabSpec, String ivyPath, String ivySettingsPath, String propertiesFilePath, String propertiesContent, LabelRestrictionClass labelRestriction, boolean enableConcurrentBuild, boolean contextSerialized, boolean debug) throws ANTLRException {
         super(cronTabSpec, (labelRestriction == null) ? null : labelRestriction.getTriggerLabel(), enableConcurrentBuild);
         this.ivyPath = Util.fixEmpty(ivyPath);
         this.ivySettingsPath = Util.fixEmpty(ivySettingsPath);
         this.propertiesFilePath = Util.fixEmpty(propertiesFilePath);
         this.propertiesContent = Util.fixEmpty(propertiesContent);
+        this.contextSerialized = contextSerialized;
         this.debug = debug;
         this.labelRestriction = (labelRestriction == null) ? false : true;
         this.enableConcurrentBuild = enableConcurrentBuild;
@@ -83,6 +94,12 @@ public class IvyTrigger extends AbstractTriggerByFullContext<IvyTriggerContext> 
         return propertiesContent;
     }
 
+
+    @SuppressWarnings("unused")
+    public boolean isContextSerialized() {
+        return contextSerialized;
+    }
+    
     @SuppressWarnings("unused")
     public boolean isDebug() {
         return debug;
@@ -202,6 +219,46 @@ public class IvyTrigger extends AbstractTriggerByFullContext<IvyTriggerContext> 
         }
         return new IvyTriggerContext(dependencies);
     }
+    
+    @Override
+    /**
+     * I attempt to read the previous context from the job config directory on the master
+     * server filesystem, and assign it to the in-memory context
+     * @param log
+     * @return true if the context was read from file
+     */
+    protected boolean readContextFromFile(XTriggerLog log) {
+        
+        if (isContextSerialized()) {
+            try {
+                File contextFile = new File (job.getRootDir(), "IvyTriggerContext.ser");
+                log.info("The new serialised context File object points at: " + contextFile.getAbsolutePath());
+                FileInputStream fileInputStream = new FileInputStream(contextFile);
+                log.info("Successfully created FileInputStream to context file");
+                ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
+                log.info("Successfully created ObjectInputStream to FileInputStream for context file");
+                IvyTriggerContext serializedContext = (IvyTriggerContext) objectInputStream.readObject();
+                log.info("Successfully read serializedContext from  ObjectInputStream");
+                this.resetOldContext(serializedContext);
+                log.info("Successfully assigned serializedContext to this.context");
+                objectInputStream.close();
+                log.info("Successfully closed ObjectInputStream to FileInputStream for context file");
+                return true;
+            }
+            catch (IOException ioException) {
+                log.error("IOExeption while deserializing the previous IvyTriggerContext object: " + ioException.getMessage());
+                return false;
+            }
+            catch (ClassNotFoundException classNotFoundException) {
+                log.error("ClassNotFoundException while deserializing the previous IvyTriggerContext object: " + classNotFoundException.getMessage());
+                return false;
+            }
+        } else {
+            log.info("The current job (" + job.getDisplayName() + ") does not persist its dependency tree to disk");
+            return false;
+        }
+        
+    }
 
     private Map<String, IvyDependencyValue> getDependenciesMapForNode(Node launcherNode,
                                                                       XTriggerLog log,
@@ -235,6 +292,30 @@ public class IvyTrigger extends AbstractTriggerByFullContext<IvyTriggerContext> 
                                       IvyTriggerContext newIvyTriggerContext,
                                       XTriggerLog log)
             throws XTriggerException {
+        
+        // if contextSerialized config is set, serialize the new context information to disk in the job's workspace
+        if (isContextSerialized()) {
+            log.info("Save resolved dependencies to disk is set to true (contextSerialized=true)");
+            log.info("Attempting to serialize new IvyTriggerContext to job config directory");
+            try {
+                File contextFile = new File (job.getRootDir(), "IvyTriggerContext.ser");
+                log.info("The new serialised context File object points at: " + contextFile.getAbsolutePath());
+                contextFile.delete();
+                log.info("Successfully deleted the serialised context file");
+                FileOutputStream fileOutputStream = new FileOutputStream(contextFile);
+                log.info("Successfully created FileOutputStream to context file");
+                ObjectOutputStream out = new ObjectOutputStream(fileOutputStream);
+                log.info("Successfully created ObjectOutputStream to FileOutputStream for context file");
+                out.writeObject(newIvyTriggerContext);
+                log.info("Successfully wrote newIvyTriggerContext to  ObjectOutputStream");
+                out.close();
+                log.info("Successfully closed ObjectOutputStream to FileOutputStream for context file");
+            
+                } catch (IOException e) {
+                    log.error("IOException while serializing the new IvyTriggerContext object: " + e.getMessage());
+                }
+            }
+
 
         Map<String, IvyDependencyValue> previousDependencies = previousIvyTriggerContext.getDependencies();
 
@@ -338,6 +419,8 @@ public class IvyTrigger extends AbstractTriggerByFullContext<IvyTriggerContext> 
         //Check if the revision has changed
         String previousRevision = previousDependencyValue.getRevision();
         String newRevision = newDependencyValue.getRevision();
+        log.info(String.format("The previous version recorded was %s.", previousRevision));
+        log.info(String.format("The new computed version is %s.", newRevision));
         if (!newRevision.equals(previousRevision)) {
             log.info("....The dependency version has changed for "+dependencyName+" .");
             log.info(String.format("....The previous version recorded was %s.", previousRevision));

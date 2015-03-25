@@ -12,11 +12,16 @@
              title="${%Properties file to load}">
         <f:textbox name="propertiesFilePath" value="${instance.propertiesFilePath}"/>
     </f:entry>
-
+    
     <f:entry field="propertiesContent"
              title="${%Properties Content}">
         <f:textarea name="propertiesContent" value="${instance.propertiesContent}"/>
     </f:entry>
+    
+    <f:entry field="contextSerialized"
+             title="${%Save resolved dependencies to disk}">
+        <f:checkbox name="contextSerialized" checked="${instance.contextSerialized}"/>
+    </f:entry>   
 
     <f:entry field="debug"
              title="${%Active debug mode on artifacts resolution}">

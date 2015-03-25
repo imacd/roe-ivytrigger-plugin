@@ -10,7 +10,7 @@
     <artifactId>roe-ivytrigger</artifactId>
     <packaging>hpi</packaging>
     <name>Jenkins - ROE IvyTrigger Plug-in</name>
-    <version>0.36-SNAPSHOT</version>
+    <version>0.37-SNAPSHOT</version>
     <url>https://github.com/alexouzounis/ROE-ivytrigger-plugin</url>
 
     <licenses>
